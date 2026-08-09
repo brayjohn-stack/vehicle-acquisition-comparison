@@ -1233,3 +1233,201 @@ select.plain {
   margin: 8px 0 0;
   line-height: 1.45;
 }
+
+/* lender program panel */
+
+.program-quote {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 12px 0 2px;
+}
+
+.program-quote .btn {
+  margin-left: auto;
+}
+
+.program-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-left: 3px solid var(--brass);
+  background: var(--brass-bg);
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--slate);
+}
+
+.checks {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.checks li {
+  font-size: 12px;
+  line-height: 1.45;
+  padding-left: 16px;
+  position: relative;
+  color: var(--slate);
+}
+
+.checks li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.checks li[data-level='error'] {
+  color: var(--negative);
+}
+
+.checks li[data-level='error']::before {
+  background: var(--negative);
+}
+
+.checks li[data-level='warning']::before {
+  background: var(--brass);
+}
+
+/* considerations list */
+
+.consider {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.consider li {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--slate);
+  padding-left: 15px;
+  position: relative;
+}
+
+.consider li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 7px;
+  border-top: 1px solid var(--brass);
+}
+
+/* ---------- phone ---------- */
+
+@media (max-width: 720px) {
+  body {
+    font-size: 15px;
+  }
+
+  .stage {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .stage-head {
+    padding: 10px 14px;
+  }
+
+  .stage-head .chip-row {
+    display: none;
+  }
+
+  .stage-body {
+    padding: 16px 14px 8px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .step-head h2 {
+    font-size: 19px;
+  }
+
+  .step-head p {
+    font-size: 12.5px;
+  }
+
+  .figure-lg {
+    font-size: 32px;
+  }
+
+  .headline-plate {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .headline-plate .breakdown {
+    text-align: left;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* The comparison tables stay readable by scrolling sideways rather than
+     shrinking the numbers past legibility. */
+  .summary-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .summary-table th,
+  .summary-table td {
+    padding: 7px 11px;
+    font-size: 12.5px;
+  }
+
+  .scenario {
+    gap: 12px;
+  }
+
+  .stage-foot {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .stage-foot .dots {
+    display: none;
+  }
+
+  .nav-actions .btn {
+    padding: 10px 20px;
+  }
+
+  .setup-body {
+    padding: 14px 12px 40px;
+  }
+
+  .field-grid,
+  .field-grid.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cost-row {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .program-quote {
+    gap: 16px;
+  }
+}

@@ -30,7 +30,15 @@ export function inventoryTax(deal: Deal): number {
 export function totalFees(deal: Deal): number {
   const f = deal.fees;
   return (
-    f.bankFee + f.titleLicense + f.docFee + inventoryTax(deal) + f.delivery + f.serviceAgreement + f.facilitatorFee + f.other
+    f.bankFee +
+    f.titleLicense +
+    f.docFee +
+    inventoryTax(deal) +
+    f.delivery +
+    f.serviceAgreement +
+    f.gapInsurance +
+    f.facilitatorFee +
+    f.other
   );
 }
 
@@ -133,6 +141,7 @@ export function buildUpLines(deal: Deal, method: MethodKey, reduction: number): 
     ['Doc fee', f.docFee],
     ['Delivery', f.delivery],
     ['Vehicle service agreement', f.serviceAgreement],
+    ['GAP insurance', f.gapInsurance],
     ['Facilitator fee', f.facilitatorFee],
     ['Bank fee', f.bankFee],
     ['Other', f.other],

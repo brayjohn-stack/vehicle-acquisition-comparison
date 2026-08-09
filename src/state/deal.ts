@@ -27,6 +27,7 @@ export function createEmptyDeal(): Deal {
       inventoryTax: 0,
       inventoryTaxRate: 0,
       inventoryTaxMode: 'amount',
+      gapInsurance: 0,
       delivery: 0,
       serviceAgreement: 0,
       facilitatorFee: 0,
@@ -56,6 +57,18 @@ export function createEmptyDeal(): Deal {
       residualBasisCustom: 0,
       firstPaymentDays: 30,
     },
+    quantity: 1,
+    rates: {
+      kind: 'comtrac',
+      tier: 'A',
+      vehicleClass: 'new',
+      federalExempt: false,
+      directOrEv: false,
+      municipalOutstandings: 0,
+      edcAwv: 0,
+      applyToFinance: false,
+    },
+    liquidity: { enabled: false, reinvestmentRate: 0 },
     estimatedVehicleValue: 0,
     nextVehiclePrice: 0,
     showReplacementStep: true,
@@ -64,6 +77,9 @@ export function createEmptyDeal(): Deal {
     methods: { cash: false, finance: true, lease: true },
     showTransactionCosts: false,
     showTradeStep: true,
+    showConsiderationsStep: true,
+    showCycleStep: false,
+    cycleCount: 2,
   };
 }
 
@@ -77,6 +93,7 @@ export function createSampleDeal(): Deal {
     msrp: 62500,
     acquisitionPrice: 60125,
     fees: { ...deal.fees, bankFee: 695, titleLicense: 470 },
+    rates: { ...deal.rates, kind: 'manual' },
     finance: { ...deal.finance, apr: 0.0899, termMonths: 60, timing: 'arrears', downPayment: 0 },
     lease: { ...deal.lease, apr: 0.0899, termMonths: 60, timing: 'advance', residualPercent: 0.2 },
     estimatedVehicleValue: 20000,
@@ -128,6 +145,8 @@ function reconcile(stored: unknown): Deal {
     finance: { ...base.finance, ...(s.finance ?? {}) },
     lease: { ...base.lease, ...(s.lease ?? {}) },
     methods: { ...base.methods, ...(s.methods ?? {}) },
+    rates: { ...base.rates, ...(s.rates ?? {}) },
+    liquidity: { ...base.liquidity, ...(s.liquidity ?? {}) },
     additionalCosts: Array.isArray(s.additionalCosts)
       ? s.additionalCosts.map((c: Partial<AdditionalCost>) => newCostRow(c))
       : [],

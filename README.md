@@ -121,6 +121,28 @@ gross $65,047.8125 · 8.99% APR · payments in advance.
 
 All five reproduce exactly (`npm run test`). Case C computes $1,181.643868 before rounding.
 
+## Lender programs
+
+`src/rates/ally.ts` holds the Ally Commercial Services Group ComTRAC and Municipal
+Lease Purchase rate sheet, effective August 4, 2026:
+
+- ComTRAC rates by vehicle class (New / CSU 2027–2025 / 2024), term band and tier S–C
+- Maximum residual by term year and tier
+- Maximum advance as a share of EDC/AWV, split at $80,000
+- Municipal rates by outstandings band and term, with the 100% / 95% advance cap
+- Dealer participation minimums and the 2.50% / 2.00% DFI ceilings
+- The 0.75 point federal exempt loading, the $5,000 minimum, and the direct
+  ComTRAC / EV floor of 20% residual at 60 months maximum
+
+The sheet is marked "For Dealer Use Only; NOT for Distribution to Consumers", so
+none of it renders in the client presentation. It fills the operator's rate and
+residual assumptions and flags deals outside program limits, quantifying the cash
+needed to bring an over-advanced deal back inside the cap.
+
+Rates change. Update the tables in `src/rates/ally.ts` and change
+`RATE_SHEET_EFFECTIVE`, which is displayed in the setup panel so a stale sheet is
+visible rather than silent.
+
 ## Assumptions the operator controls
 
 Nothing about tax treatment is hard-coded as a rule. Rates, whether cash/finance and lease share a

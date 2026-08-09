@@ -1,3 +1,5 @@
+import type { AllyTier, RateProgramKind, VehicleClass } from '../rates/ally';
+
 export type PaymentTiming = 'arrears' | 'advance';
 export type MethodKey = 'cash' | 'finance' | 'lease';
 
@@ -19,6 +21,7 @@ export interface TransactionFees {
   /** Rate against the sale price, used when inventoryTaxMode is 'rate' (e.g. 0.001886). */
   inventoryTaxRate: number;
   inventoryTaxMode: 'amount' | 'rate';
+  gapInsurance: number;
   delivery: number;
   serviceAgreement: number;
   facilitatorFee: number;
@@ -80,6 +83,27 @@ export interface LeaseTerms {
   firstPaymentDays: number;
 }
 
+/** Lender program selections. Never shown in the client presentation. */
+export interface RateProgramSettings {
+  kind: RateProgramKind;
+  tier: AllyTier;
+  vehicleClass: VehicleClass;
+  federalExempt: boolean;
+  directOrEv: boolean;
+  municipalOutstandings: number;
+  /** Estimated dealer cost / average wholesale value incl. upfits. 0 uses the selling price. */
+  edcAwv: number;
+  /** Apply the program rate to the finance column as well as the lease. */
+  applyToFinance: boolean;
+}
+
+/** Optional, operator-entered. Off by default: no return is assumed unless stated. */
+export interface LiquiditySettings {
+  enabled: boolean;
+  /** Annual return the business expects on capital it retains, as a decimal. */
+  reinvestmentRate: number;
+}
+
 export interface Deal {
   clientName: string;
   vehicleDescription: string;
@@ -92,6 +116,10 @@ export interface Deal {
   trade: TradeIn;
   finance: FinanceTerms;
   lease: LeaseTerms;
+  /** Number of identical units in the deal. Per-unit figures are multiplied for fleet totals. */
+  quantity: number;
+  rates: RateProgramSettings;
+  liquidity: LiquiditySettings;
   estimatedVehicleValue: number;
   /** Cost of the replacement vehicle. Falls back to the current acquisition price. */
   nextVehiclePrice: number;
@@ -101,4 +129,8 @@ export interface Deal {
   methods: Record<MethodKey, boolean>;
   showTransactionCosts: boolean;
   showTradeStep: boolean;
+  showConsiderationsStep: boolean;
+  showCycleStep: boolean;
+  /** Number of replacement cycles in the long-horizon step. */
+  cycleCount: number;
 }

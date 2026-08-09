@@ -45,8 +45,12 @@ describe('application smoke test', () => {
     expect(host.textContent).toContain('How are we acquiring the vehicle?');
 
     const dots = host.querySelectorAll('.dot').length;
-    expect(dots).toBe(7); // adds the next-vehicle step
-    for (let i = 1; i < dots; i++) await click('Next');
+    // acquisition, amortization, monthly, deployed, position, next vehicle,
+    // summary, considerations — the long-horizon step is off by default.
+    expect(dots).toBe(8);
+
+    // Walk to the summary, which sits second to last.
+    for (let i = 0; i < dots - 2; i++) await click('Next');
     expect(host.textContent).toContain('Estimated equity');
     expect(host.querySelector('.summary-table')).toBeTruthy();
 
@@ -60,7 +64,12 @@ describe('application smoke test', () => {
       expect(t.textContent!.length).toBeGreaterThan(20);
     }
 
-    await click('Edit deal');
+    await click('Next');
+    expect(host.textContent).toContain('Which structure fits the business?');
+
+    
+
+await click('Edit deal');
     expect(host.textContent).toContain('Deal setup');
   });
 });

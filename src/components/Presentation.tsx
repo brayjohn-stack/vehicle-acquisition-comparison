@@ -8,6 +8,8 @@ import {
   StepMonthly,
   StepPosition,
   StepSummary,
+  StepConsiderations,
+  StepCycles,
   StepReplacement,
   StepTrade,
   type StepProps,
@@ -98,6 +100,16 @@ export default function Presentation({ deal, step, onStepChange, onDealChange, o
       });
     }
 
+    if (deal.showCycleStep) {
+      list.push({
+        id: 'cycles',
+        eyebrow: 'Long horizon',
+        title: `Across ${Math.max(2, deal.cycleCount)} replacement cycles`,
+        intro: 'Equity from each cycle is applied to the next, on the same terms throughout.',
+        render: (p) => <StepCycles {...p} />,
+      });
+    }
+
     list.push({
       id: 'summary',
       eyebrow: 'Summary',
@@ -106,8 +118,26 @@ export default function Presentation({ deal, step, onStepChange, onDealChange, o
       render: (p) => <StepSummary {...p} />,
     });
 
+    if (deal.showConsiderationsStep) {
+      list.push({
+        id: 'considerations',
+        eyebrow: 'Considerations',
+        title: 'Which structure fits the business?',
+        intro: 'The trade is between total cost and cash flow. Neither is universally right.',
+        render: (p) => <StepConsiderations {...p} />,
+      });
+    }
+
     return list;
-  }, [deal.trade.enabled, deal.showTradeStep, deal.showReplacementStep, month]);
+  }, [
+    deal.trade.enabled,
+    deal.showTradeStep,
+    deal.showReplacementStep,
+    deal.showCycleStep,
+    deal.showConsiderationsStep,
+    deal.cycleCount,
+    month,
+  ]);
 
   const index = Math.min(Math.max(step, 0), steps.length - 1);
   const current = steps[index];

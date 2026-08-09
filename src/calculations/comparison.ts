@@ -38,6 +38,7 @@ export interface MethodComparison {
 
 export interface ComparisonResult {
   activeMethods: MethodKey[];
+  quantity: number;
   comparisonMonth: number;
   estimatedVehicleValue: number;
   totalProjectCost: number;
@@ -49,6 +50,11 @@ export interface ComparisonResult {
   lease: LeaseResult | null;
   methods: MethodComparison[];
   liquidity: {
+    /**
+     * Optional and operator-entered: the value of capital a structure leaves in
+     * the business, compounded at a rate the operator supplies. Null unless enabled.
+     */
+    retainedValue: Record<string, number> | null;
     /** Difference in scheduled monthly cash requirement between finance and lease. */
     monthlyDifference: number | null;
     monthlyDifferenceOverTerm: number | null;
@@ -173,6 +179,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
 
   return {
     activeMethods,
+    quantity: Math.max(1, Math.round(deal.quantity || 1)),
     comparisonMonth: month,
     estimatedVehicleValue: value,
     totalProjectCost: costs.totalProjectCost,
@@ -183,6 +190,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
     lease,
     methods,
     liquidity: {
+      retainedValue: liquidityValue(deal, methods, month),
       monthlyDifference,
       monthlyDifferenceOverTerm:
         monthlyDifference === null ? null : round2(monthlyDifference * termForDifference),
@@ -190,6 +198,45 @@ export function computeComparison(deal: Deal): ComparisonResult {
     },
     takeaways: buildTakeaways({ methods, finance, lease, cash, month, value, monthlyDifference, initialLiquidityRetained }),
   };
+}
+
+/**
+ * Future value at the comparison month of the cash each structure does NOT
+ * require, measured against whichever structure demands the most cash, at a
+ * return the operator states. No return is assumed unless it is entered.
+ */
+function liquidityValue(
+  deal: Deal,
+  methods: MethodComparison[],
+  month: number,
+): Record<string, number> | null {
+  if (!deal.liquidity.enabled || deal.liquidity.reinvestmentRate <= 0 || methods.length < 2) return null;
+  const r = deal.liquidity.reinvestmentRate / 12;
+
+  const series = (m: MethodComparison): number[] => {
+    const out: number[] = [];
+    for (let t = 0; t <= month; t++) {
+      if (t === 0) out.push(m.initialCash);
+      else if (m.monthlyPayment !== null && t <= (m.termMonths ?? 0)) out.push(m.monthlyPayment);
+      else out.push(0);
+    }
+    return out;
+  };
+
+  const all = methods.map(series);
+  const reference = methods.reduce((a, b) => (b.cumulativeCash > a.cumulativeCash ? b : a));
+  const ref = series(reference);
+
+  const result: Record<string, number> = {};
+  methods.forEach((m, i) => {
+    let fv = 0;
+    for (let t = 0; t <= month; t++) {
+      const retained = ref[t] - all[i][t];
+      fv = (fv + retained) * (1 + r);
+    }
+    result[m.key] = round2(fv);
+  });
+  return result;
 }
 
 interface TakeawayInput {

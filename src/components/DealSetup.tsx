@@ -7,6 +7,7 @@ import { computeTrade } from '../calculations/trade';
 import { computeLease } from '../calculations/lease';
 import { formatCurrency, formatMoneyCompact } from '../calculations/money';
 import BuildUpPanel from './BuildUpPanel';
+import RateProgramPanel from './RateProgramPanel';
 
 interface Props {
   deal: Deal;
@@ -81,6 +82,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </Field>
                 <Field label="MSRP">
                   <MoneyInput value={deal.msrp} onChange={(v) => set({ msrp: v })} />
+                </Field>
+                <Field label="Quantity" hint="identical units">
+                  <IntegerInput value={deal.quantity} onChange={(v) => set({ quantity: Math.max(1, v) })} suffix="units" />
                 </Field>
                 <Field label="Selling price" hint={deal.acquisitionPrice > 0 ? undefined : 'defaults to MSRP'}>
                   <MoneyInput value={deal.acquisitionPrice} onChange={(v) => set({ acquisitionPrice: v })} />
@@ -336,6 +340,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 <Field label="Delivery">
                   <MoneyInput value={deal.fees.delivery} onChange={(v) => set({ fees: { ...deal.fees, delivery: v } })} />
                 </Field>
+                <Field label="GAP insurance">
+                  <MoneyInput value={deal.fees.gapInsurance} onChange={(v) => set({ fees: { ...deal.fees, gapInsurance: v } })} />
+                </Field>
                 <Field label="Service agreement">
                   <MoneyInput
                     value={deal.fees.serviceAgreement}
@@ -575,6 +582,37 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 .
               </p>
             </Panel>
+
+            <Panel title="Presentation steps" hint="Toggle what the client sees">
+              <div style={{ display: 'grid', gap: 9 }}>
+                <Check checked={deal.showReplacementStep} onChange={(v) => set({ showReplacementStep: v })}>
+                  Next vehicle — what carries forward
+                </Check>
+                <Check checked={deal.showCycleStep} onChange={(v) => set({ showCycleStep: v })}>
+                  Long horizon — across replacement cycles
+                </Check>
+                {deal.showCycleStep && (
+                  <div className="field-grid" style={{ marginTop: 2 }}>
+                    <Field label="Number of cycles">
+                      <IntegerInput
+                        value={deal.cycleCount}
+                        onChange={(v) => set({ cycleCount: Math.min(4, Math.max(2, v)) })}
+                        suffix="cycles"
+                      />
+                    </Field>
+                  </div>
+                )}
+                <Check checked={deal.showConsiderationsStep} onChange={(v) => set({ showConsiderationsStep: v })}>
+                  Considerations — where each structure fits
+                </Check>
+              </div>
+              <p className="note" style={{ marginBottom: 0 }}>
+                Review the long horizon step before showing it. It depends heavily on the replacement cost and future
+                value you assume, and it will not always favour the same structure.
+              </p>
+            </Panel>
+
+            <RateProgramPanel deal={deal} onChange={onChange} />
 
             <BuildUpPanel deal={deal} />
           </div>

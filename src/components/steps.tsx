@@ -2,11 +2,19 @@ import type { Deal, MethodKey } from '../types/deal';
 import type { ComparisonResult, MethodComparison } from '../calculations/comparison';
 import { formatCurrency, formatMoneyCompact, formatPercent } from '../calculations/money';
 import { AmortBar, Col, Equation, Plate, Spec, Term, TOOLTIPS } from './columns';
+import { projectCycles } from '../calculations/cycles';
 
 export interface StepProps {
   deal: Deal;
   result: ComparisonResult;
 }
+
+/**
+ * The single most common client question, answered factually. A lease at the same
+ * rate does accrue more finance charge; the reason is mechanical, not a markup.
+ */
+export const INTEREST_EXPLAINER =
+  'At the same rate, a lease accrues more finance charge than a loan. A loan amortizes the balance to zero, so the interest charged each month shrinks as the balance falls. A lease amortizes only down to the residual, so interest continues to be charged on that residual balance for every month of the term. Lower payment, higher total finance charge — the trade is cash flow, not cost.';
 
 const SHORT_LABEL: Record<MethodKey, string> = {
   cash: 'Cash',
@@ -434,11 +442,135 @@ export function StepReplacement({ result }: StepProps) {
   );
 }
 
+/* ---------------- Replacement cycles — the long horizon ---------------- */
+
+export function StepCycles({ deal, result }: StepProps) {
+  const cycles = Math.max(2, deal.cycleCount);
+  const projections = result.methods.map((m) => projectCycles(deal, m.key, cycles));
+  const years = Math.round((projections[0]?.totalMonths ?? 0) / 12);
+
+  return (
+    <>
+      <table className="summary-table">
+        <thead>
+          <tr>
+            <th className="metric">Across {cycles} cycles — roughly {years} years</th>
+            {result.methods.map((x) => (
+              <th key={x.key} data-key={x.key}>
+                {SHORT_LABEL[x.key]}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: cycles }, (_, i) => (
+            <tr key={i} className={i === 0 ? undefined : 'group-start'}>
+              <td className="metric">
+                Cycle {i + 1} — monthly payment, cash outflow
+              </td>
+              {projections.map((p) => (
+                <td key={p.key}>
+                  {p.legs[i].monthlyPayment === null ? '—' : formatCurrency(p.legs[i].monthlyPayment ?? 0)}
+                  <span className="muted"> · {formatCurrency(p.legs[i].cashOutflow, 0)}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr className="group-start">
+            <td className="metric">Total cash outflow</td>
+            {projections.map((p) => (
+              <td key={p.key}>{formatCurrency(p.totalCashOutflow, 0)}</td>
+            ))}
+          </tr>
+          <tr>
+            <td className="metric">Equity held at the end</td>
+            {projections.map((p) => (
+              <td key={p.key} className={p.finalEquity < 0 ? 'neg' : 'pos'}>
+                {formatCurrency(p.finalEquity, 0)}
+              </td>
+            ))}
+          </tr>
+          <tr className="emphasis">
+            <td className="metric">Net cost across the horizon</td>
+            {projections.map((p) => (
+              <td key={p.key}>{formatCurrency(p.netCost, 0)}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <p className="table-legend">
+        Each cycle assumes the same term, rate and structure, with equity from one cycle applied to the next and any
+        shortfall paid at termination. Replacement cost and future values are assumptions, and small changes to them move
+        these totals substantially.
+      </p>
+    </>
+  );
+}
+
+/* ---------------- Considerations ---------------- */
+
+export function StepConsiderations({ result }: StepProps) {
+  const lease = result.lease;
+  const finance = result.finance;
+  return (
+    <>
+      <div className="columns" data-count={result.activeMethods.length >= 2 ? 2 : 1}>
+        <div className="col" data-key="finance">
+          <div className="col-title">
+            <span className="name">Where finance tends to fit</span>
+          </div>
+          <ul className="consider">
+            <li>The balance amortizes to zero, so the asset is owned outright at maturity.</li>
+            <li>Lower total finance charge at the same rate, because nothing is left accruing interest.</li>
+            <li>Full estimated value carries into the next vehicle rather than only the amount above a residual.</li>
+            <li>Suits a business holding cash reserves that intends to keep the vehicle well past the term.</li>
+            {finance && <li>Requires {formatCurrency(finance.payment)} per month against the lease alternative.</li>}
+          </ul>
+        </div>
+        <div className="col" data-key="lease">
+          <div className="col-title">
+            <span className="name">Where an open-end lease tends to fit</span>
+          </div>
+          <ul className="consider">
+            <li>Lower monthly requirement, because only the amount above the residual amortizes.</li>
+            <li>Less capital committed at acquisition, leaving working capital in the business.</li>
+            <li>Advance limits can allow more of the upfit and soft costs to be carried in the transaction.</li>
+            <li>Suits a business expanding quickly where monthly overhead governs what contracts it can take.</li>
+            {lease && (
+              <li>
+                Leaves {formatMoneyCompact(lease.residualAmount)} payable at maturity, satisfied by sale, payoff,
+                refinance or return.
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      {lease && (
+        <div className="strip">
+          <div className="amount">{formatMoneyCompact(lease.residualAmount)}</div>
+          <div className="text">
+            Exit paths at month {lease.termMonths}: sell the vehicle and settle the residual from proceeds; pay the
+            residual and own it; refinance the remaining balance; or return it under the terms of the agreement. The
+            outcome depends on the vehicle's value at that date.
+          </div>
+        </div>
+      )}
+
+      <p className="note" style={{ margin: 0 }}>
+        Tax treatment, deductibility and balance sheet presentation depend on the client's circumstances and should be
+        confirmed with their CPA. Nothing here is tax or accounting advice.
+      </p>
+    </>
+  );
+}
+
 /* ---------------- Step 6 — comparison summary ---------------- */
 
 export function StepSummary({ deal, result }: StepProps) {
   const month = result.comparisonMonth;
   const m = result.methods;
+  const retained = result.liquidity.retainedValue;
   const dash = '—';
 
   /**
@@ -511,7 +643,9 @@ export function StepSummary({ deal, result }: StepProps) {
             {cell((x) => (x.scheduledEndingBalance === null ? dash : formatCurrency(x.scheduledEndingBalance, 0)))}
           </tr>
           <tr>
-            <td className="metric">Total interest / finance charge</td>
+            <td className="metric">
+              <Term tip={INTEREST_EXPLAINER}>Total interest / finance charge</Term>
+            </td>
             {cell((x) => (x.totalInterest === null ? dash : formatCurrency(x.totalInterest, 0)))}
           </tr>
           <tr className="group-start">
@@ -545,6 +679,20 @@ export function StepSummary({ deal, result }: StepProps) {
             </td>
             {marked((x) => x.netCostOfUse, (x) => formatCurrency(x.netCostOfUse, 0), 'low')}
           </tr>
+          {retained && (
+            <tr>
+              <td className="metric">
+                <Term tip="A stated assumption, not a projection: the cash a structure does not require, compounded at the rate entered in setup.">
+                  Value of retained liquidity at {formatPercent(deal.liquidity.reinvestmentRate)}
+                </Term>
+              </td>
+              {marked(
+                (x) => retained[x.key] ?? 0,
+                (x) => formatCurrency(retained[x.key] ?? 0, 0),
+                'high',
+              )}
+            </tr>
+          )}
           {deal.showTransactionCosts && (
             <tr className="group-start">
               <td className="metric">Transaction costs included</td>
@@ -553,6 +701,18 @@ export function StepSummary({ deal, result }: StepProps) {
           )}
         </tbody>
       </table>
+
+      {result.quantity > 1 && (
+        <p className="table-legend">
+          Figures are per unit. Across {result.quantity} units the fleet monthly requirement is{' '}
+          {result.methods
+            .filter((x) => x.monthlyPayment !== null)
+            .map((x) => `${SHORT_LABEL[x.key]} ${formatCurrency((x.monthlyPayment ?? 0) * result.quantity)}`)
+            .join(', ')}
+          , and net cost over the period totals{' '}
+          {result.methods.map((x) => `${SHORT_LABEL[x.key]} ${formatCurrency(x.netCostOfUse * result.quantity, 0)}`).join(', ')}.
+        </p>
+      )}
 
       <p className="table-legend">
         A marker indicates the lower cash figure or the higher equity figure in that row only. It is not a
