@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Deal } from '../types/deal';
 import { computeComparison } from '../calculations/comparison';
 import {
@@ -15,6 +15,7 @@ import {
   type StepProps,
 } from './steps';
 import ScenarioBar from './ScenarioBar';
+import QuickAdjust from './QuickAdjust';
 
 interface StepDefinition {
   id: string;
@@ -37,6 +38,7 @@ interface Props {
 export default function Presentation({ deal, step, onStepChange, onDealChange, onEdit }: Props) {
   const result = useMemo(() => computeComparison(deal), [deal]);
   const month = result.comparisonMonth;
+  const [adjusting, setAdjusting] = useState(false);
 
   const steps: StepDefinition[] = useMemo(() => {
     const list: StepDefinition[] = [
@@ -157,19 +159,30 @@ export default function Presentation({ deal, step, onStepChange, onDealChange, o
         e.preventDefault();
         onStepChange(Math.max(index - 1, 0));
       } else if (e.key === 'Escape') {
-        onEdit();
+        if (adjusting) setAdjusting(false);
+        else onEdit();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [index, steps.length, onStepChange, onEdit]);
+  }, [index, steps.length, onStepChange, onEdit, adjusting]);
 
   return (
     <div className="stage">
       <header className="stage-head">
         <div>
           <div className="client">{deal.clientName || 'Vehicle acquisition comparison'}</div>
-          {deal.vehicleDescription ? <div className="vehicle">{deal.vehicleDescription}</div> : null}
+          <div className="vehicle">
+            {deal.vehicleDescription ? `${deal.vehicleDescription} · ` : ''}
+            {[
+              deal.methods.finance ? `Finance ${deal.finance.termMonths} mo` : null,
+              deal.methods.lease ? `Lease ${deal.lease.termMonths} mo` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            {' · compared at month '}
+            {month}
+          </div>
         </div>
         <div className="right">
           <div className="chip-row">
@@ -179,6 +192,9 @@ export default function Presentation({ deal, step, onStepChange, onDealChange, o
               </span>
             ))}
           </div>
+          <button className="btn" onClick={() => setAdjusting(true)}>
+            Adjust
+          </button>
           <button className="btn btn-quiet" onClick={onEdit}>
             Edit deal
           </button>
@@ -231,6 +247,8 @@ export default function Presentation({ deal, step, onStepChange, onDealChange, o
           </button>
         </div>
       </footer>
+
+      {adjusting && <QuickAdjust deal={deal} onChange={onDealChange} onClose={() => setAdjusting(false)} />}
     </div>
   );
 }

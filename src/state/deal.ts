@@ -69,6 +69,7 @@ export function createEmptyDeal(): Deal {
       municipalOutstandings: 0,
       baseVehicleValue: 0,
       applyToFinance: false,
+      linkTerms: true,
     },
     liquidity: { enabled: false, reinvestmentRate: 0 },
     estimatedVehicleValue: 0,

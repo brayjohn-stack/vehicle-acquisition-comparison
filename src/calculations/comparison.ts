@@ -74,11 +74,12 @@ export function resolveComparisonMonth(deal: Deal): number {
   if (deal.comparisonMonthMode === 'custom') {
     return Math.max(0, Math.round(deal.comparisonMonth));
   }
-  const terms: number[] = [];
-  if (deal.methods.finance) terms.push(deal.finance.termMonths);
-  if (deal.methods.lease) terms.push(deal.lease.termMonths);
-  if (terms.length === 0) return Math.max(0, Math.round(deal.comparisonMonth));
-  return Math.max(...terms);
+  // The lease term governs when both structures are measured. A longer loan is
+  // then shown with its remaining payoff at that date, which is the honest
+  // comparison rather than running the lease past maturity.
+  if (deal.methods.lease) return deal.lease.termMonths;
+  if (deal.methods.finance) return deal.finance.termMonths;
+  return Math.max(0, Math.round(deal.comparisonMonth));
 }
 
 export function computeComparison(deal: Deal): ComparisonResult {

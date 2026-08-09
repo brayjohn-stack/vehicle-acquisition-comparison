@@ -39,7 +39,14 @@ describe('application smoke test', () => {
 
     // The buyer's order sample must tie to the form: 93,900 sale price at 7.25%.
     await select('buyersOrder');
+    await click('Tax');
     expect(host.textContent).toContain('6,807.75');
+
+    // Every setup tab must render without throwing.
+    for (const label of ['Costs & trade', 'Terms', 'Lender', 'Review', 'Deal']) {
+      await click(label);
+      expect(host.querySelector('.panel')).toBeTruthy();
+    }
 
     await click('Present →');
     expect(host.textContent).toContain('How are we acquiring the vehicle?');

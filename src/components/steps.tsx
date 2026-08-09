@@ -262,6 +262,26 @@ export function StepMonthly({ deal, result }: StepProps) {
         ))}
       </Columns>
 
+      {result.quantity > 1 && (
+        <div className="strip" style={{ borderLeftColor: 'var(--brass)' }}>
+          <div className="amount">
+            {formatCurrency(
+              result.methods.reduce((sum, x) => sum + (x.monthlyPayment ?? 0), 0) === 0
+                ? 0
+                : (result.methods.find((x) => x.monthlyPayment !== null)?.monthlyPayment ?? 0) * result.quantity,
+            )}
+          </div>
+          <div className="text">
+            Across {result.quantity} units the fleet monthly requirement is{' '}
+            {result.methods
+              .filter((x) => x.monthlyPayment !== null)
+              .map((x) => `${SHORT_LABEL[x.key]} ${formatCurrency((x.monthlyPayment ?? 0) * result.quantity)}`)
+              .join(' and ')}
+            .
+          </div>
+        </div>
+      )}
+
       {advanceNote && (
         <p className="note" style={{ margin: 0 }}>
           {advanceNote}
@@ -313,6 +333,13 @@ export function StepCashDeployed({ result }: StepProps) {
           );
         })}
       </Columns>
+
+      {result.quantity > 1 && (
+        <p className="note" style={{ margin: 0 }}>
+          Across {result.quantity} units, cumulative scheduled outflow through month {month} is{' '}
+          {result.methods.map((x) => `${SHORT_LABEL[x.key]} ${formatCurrency(x.cumulativeCash * result.quantity, 0)}`).join(', ')}.
+        </p>
+      )}
 
       {liquidity && liquidity.amount > 0 ? (
         <div className="strip">

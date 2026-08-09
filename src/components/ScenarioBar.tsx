@@ -1,6 +1,7 @@
 import type { Deal } from '../types/deal';
 import type { ComparisonResult } from '../calculations/comparison';
-import { formatMoneyCompact } from '../calculations/money';
+import { formatMoneyCompact, formatPercent } from '../calculations/money';
+import { applyProgramTerm } from '../rates/apply';
 
 interface Props {
   deal: Deal;
@@ -17,11 +18,10 @@ export default function ScenarioBar({ deal, result, onChange }: Props) {
   const value = deal.estimatedVehicleValue;
   const residual = result.lease?.residualAmount ?? 0;
   const setValue = (v: number) => onChange({ ...deal, estimatedVehicleValue: Math.max(0, Math.round(v)) });
-  const setMonth = (m: number) => onChange({ ...deal, comparisonMonthMode: 'custom', comparisonMonth: m });
 
-  const terms = [deal.methods.finance ? deal.finance.termMonths : 0, deal.methods.lease ? deal.lease.termMonths : 0];
-  const maxTerm = Math.max(...terms, 0);
-  const months = [24, 36, 48, 60, 72].filter((m) => m <= maxTerm);
+  const linked = deal.rates.kind !== 'manual' && deal.rates.linkTerms;
+  const termOptions = [24, 36, 48, 60, 72];
+  const setTerm = (m: number) => onChange({ ...applyProgramTerm(deal, m), comparisonMonthMode: 'term' });
 
   return (
     <div className="scenario">
@@ -51,21 +51,22 @@ export default function ScenarioBar({ deal, result, onChange }: Props) {
         )}
       </div>
 
-      {months.length > 1 && (
+      {deal.methods.lease && (
         <div className="scenario-group">
-          <span className="label">Position at month</span>
+          <span className="label">Lease term</span>
           <div className="scenario-chips">
-            {months.map((m) => (
-              <button
-                key={m}
-                className="chip-btn"
-                aria-pressed={result.comparisonMonth === m}
-                onClick={() => setMonth(m)}
-              >
-                {m}
+            {termOptions.map((m) => (
+              <button key={m} className="chip-btn" aria-pressed={deal.lease.termMonths === m} onClick={() => setTerm(m)}>
+                {m} mo
               </button>
             ))}
           </div>
+          {linked && result.lease && (
+            <span className="note" style={{ margin: 0 }}>
+              {formatPercent(result.lease.apr)} · residual {formatPercent(result.lease.residualPercent, 0)} from the tier{' '}
+              {deal.rates.tier} sheet
+            </span>
+          )}
         </div>
       )}
     </div>

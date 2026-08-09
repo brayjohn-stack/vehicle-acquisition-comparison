@@ -1,5 +1,5 @@
 import type { Deal } from '../types/deal';
-import type { AllyTier, RateProgramKind, VehicleCondition } from '../rates/ally';
+import type { AllyTier, RateProgramKind } from '../rates/ally';
 import {
   RATE_SHEET_EFFECTIVE,
   TIERS,
@@ -14,8 +14,9 @@ import {
 } from '../rates/ally';
 import { computeLease } from '../calculations/lease';
 import { computeValuation } from '../calculations/valuation';
+import { applyProgramTerm, resyncProgram } from '../rates/apply';
 import { formatCurrency, formatPercent } from '../calculations/money';
-import { Check, Field, IntegerInput, MoneyInput, Panel, PercentInput, Segmented } from './fields';
+import { Check, Field, MoneyInput, Panel, PercentInput } from './fields';
 
 /**
  * Lender program selection. The Ally sheet is marked for dealer use only, so this
@@ -75,20 +76,7 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
             <option value="manual">Manual — enter rates myself</option>
           </select>
         </Field>
-        <Field label="Condition">
-          <Segmented
-            value={r.condition}
-            options={[
-              { value: 'new' as VehicleCondition, label: 'New' },
-              { value: 'used' as VehicleCondition, label: 'Used' },
-            ]}
-            onChange={(v) => set({ condition: v })}
-          />
-        </Field>
-        <Field label="Model year">
-          <IntegerInput value={r.modelYear} onChange={(v) => set({ modelYear: v })} />
-        </Field>
-        <Field label="Rate class" hint="derived">
+        <Field label="Rate class" hint={`${r.condition === 'new' ? 'New' : 'Used'} ${r.modelYear} — set on the Deal tab`}>
           <div className="input" style={{ background: '#fbfbfa' }}>
             <span style={{ fontSize: 12.5, color: derived.supported ? 'var(--navy)' : 'var(--negative)' }}>
               {VEHICLE_CLASS_LABELS[vehicleClass]}
@@ -98,7 +86,13 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
 
         {r.kind === 'comtrac' && (
           <Field label="Credit tier">
-            <select className="plain" value={r.tier} onChange={(e) => set({ tier: e.target.value as AllyTier })}>
+            <select
+              className="plain"
+              value={r.tier}
+              onChange={(e) =>
+                onChange(resyncProgram({ ...deal, rates: { ...r, tier: e.target.value as AllyTier } }))
+              }
+            >
               {TIERS.map((t) => (
                 <option key={t} value={t}>
                   Tier {t} — {formatPercent(comtracRate(vehicleClass, deal.lease.termMonths, t))} at{' '}
@@ -164,13 +158,39 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
                 {edc >= 80000 ? 'EDC/AWV at or above $80,000' : 'EDC/AWV under $80,000'}
               </span>
             </div>
-            <button className="btn btn-primary" onClick={applyRate} disabled={quoted === null}>
-              Apply rate
-            </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              {r.kind === 'comtrac' && (
+                <button
+                  className="btn"
+                  onClick={() =>
+                    onChange({
+                      ...deal,
+                      lease: { ...deal.lease, apr: quoted ?? deal.lease.apr, residualPercent: residualCap, residualMode: 'percent' },
+                      finance: r.applyToFinance ? { ...deal.finance, apr: quoted ?? deal.finance.apr } : deal.finance,
+                    })
+                  }
+                  disabled={quoted === null}
+                >
+                  Apply rate and max residual
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={applyRate} disabled={quoted === null}>
+                Apply rate
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            <Check checked={r.applyToFinance} onChange={(v) => set({ applyToFinance: v })}>
+            <Check
+              checked={r.linkTerms}
+              onChange={(v) => onChange(applyProgramTerm({ ...deal, rates: { ...r, linkTerms: v } }, deal.lease.termMonths))}
+            >
+              Rate and residual follow the sheet when the term changes
+            </Check>
+            <Check
+              checked={r.applyToFinance}
+              onChange={(v) => onChange(resyncProgram({ ...deal, rates: { ...r, applyToFinance: v } }))}
+            >
               Apply this rate to the finance column too
             </Check>
             {r.kind === 'comtrac' && (

@@ -12,6 +12,8 @@ import {
   FEDERAL_EXEMPT_ADDER,
 } from '../src/rates/ally';
 import { computeValuation } from '../src/calculations/valuation';
+import { applyProgramTerm, isProgramSynced, resyncProgram } from '../src/rates/apply';
+import { computeComparison } from '../src/calculations/comparison';
 import { projectCycles } from '../src/calculations/cycles';
 import { createEmptyDeal, createSampleDeal, newCostRow } from '../src/state/deal';
 
@@ -228,5 +230,62 @@ describe('EDC / AWV valuation', () => {
     d.rates = { ...d.rates, baseVehicleValue: 30000 };
     d.additionalCosts = [newCostRow({ description: 'Prepaid maintenance', amount: 2000, capitalized: false })];
     expect(computeValuation(d).edcAwv).toBeCloseTo(30000, 2);
+  });
+});
+
+describe('program-linked terms', () => {
+  function linkedDeal() {
+    const d = createEmptyDeal();
+    d.rates = { ...d.rates, kind: 'comtrac', tier: 'A', condition: 'new', modelYear: 2026, linkTerms: true };
+    return d;
+  }
+
+  it('re-derives rate and residual when the term changes', () => {
+    // A 24 month lease must not carry a 60 month residual.
+    const at60 = applyProgramTerm(linkedDeal(), 60);
+    expect(at60.lease.apr).toBeCloseTo(0.0919, 6);
+    expect(at60.lease.residualPercent).toBeCloseTo(0.25, 6);
+
+    const at24 = applyProgramTerm(at60, 24);
+    expect(at24.lease.termMonths).toBe(24);
+    expect(at24.lease.apr).toBeCloseTo(0.0879, 6);
+    expect(at24.lease.residualPercent).toBeCloseTo(0.45, 6);
+  });
+
+  it('re-derives on a tier change without touching the term', () => {
+    const a = applyProgramTerm(linkedDeal(), 48);
+    const cTier = resyncProgram({ ...a, rates: { ...a.rates, tier: 'C' } });
+    expect(cTier.lease.termMonths).toBe(48);
+    expect(cTier.lease.apr).toBeCloseTo(0.1424, 6);
+    expect(cTier.lease.residualPercent).toBeCloseTo(0.2, 6);
+  });
+
+  it('leaves rate and residual alone when unlinked', () => {
+    const d = applyProgramTerm(linkedDeal(), 60);
+    const manual = { ...d, rates: { ...d.rates, linkTerms: false }, lease: { ...d.lease, apr: 0.06, residualPercent: 0.1 } };
+    const changed = applyProgramTerm(manual, 36);
+    expect(changed.lease.termMonths).toBe(36);
+    expect(changed.lease.apr).toBeCloseTo(0.06, 6);
+    expect(changed.lease.residualPercent).toBeCloseTo(0.1, 6);
+  });
+
+  it('detects when the deal has drifted from the sheet', () => {
+    const d = applyProgramTerm(linkedDeal(), 60);
+    expect(isProgramSynced(d)).toBe(true);
+    expect(isProgramSynced({ ...d, lease: { ...d.lease, residualPercent: 0.4 } })).toBe(false);
+  });
+
+  it('compares at the lease maturity even when the loan runs longer', () => {
+    const d = applyProgramTerm(linkedDeal(), 60);
+    d.methods = { cash: false, finance: true, lease: true };
+    d.finance = { ...d.finance, termMonths: 72 };
+    d.estimatedVehicleValue = 20000;
+    d.acquisitionPrice = 42527;
+    const result = computeComparison(d);
+    expect(result.comparisonMonth).toBe(60);
+    // The loan has not matured, so a payoff remains and equity is net of it.
+    const finance = result.methods.find((x) => x.key === 'finance')!;
+    expect(finance.payoffAtComparison).toBeGreaterThan(0);
+    expect(finance.estimatedEquity).toBeCloseTo(20000 - finance.payoffAtComparison, 2);
   });
 });

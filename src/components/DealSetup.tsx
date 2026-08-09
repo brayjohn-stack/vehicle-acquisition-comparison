@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import type { Deal, MethodKey } from '../types/deal';
 import { Check, Field, IntegerInput, MoneyInput, Panel, PercentInput, Segmented, TextInput } from './fields';
 import { newCostRow } from '../state/deal';
 import { TAX_PRESETS, acquisitionPrice } from '../calculations/taxes';
+import { deriveVehicleClass, maxResidual } from '../rates/ally';
+import { applyProgramTerm, isProgramSynced } from '../rates/apply';
 import { computeComparison, METHOD_LABELS } from '../calculations/comparison';
 import { computeTrade } from '../calculations/trade';
 import { computeLease } from '../calculations/lease';
@@ -23,12 +26,26 @@ const STRUCTURE_DESCRIPTIONS: Record<MethodKey, string> = {
   lease: 'Amortizes to a scheduled residual rather than to zero.',
 };
 
+const TABS = [
+  { key: 'deal', label: 'Deal' },
+  { key: 'costs', label: 'Costs & trade' },
+  { key: 'tax', label: 'Tax' },
+  { key: 'terms', label: 'Terms' },
+  { key: 'lender', label: 'Lender' },
+  { key: 'review', label: 'Review' },
+] as const;
+
 export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onReset }: Props) {
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('deal');
   const set = (patch: Partial<Deal>) => onChange({ ...deal, ...patch });
   const comparison = computeComparison({ ...deal, methods: { cash: true, finance: true, lease: true } });
   const trade = computeTrade(deal);
   const leasePreview = computeLease(deal);
   const anySelected = Object.values(deal.methods).some(Boolean);
+  const vehicleClassNote = deriveVehicleClass(deal.rates.condition, deal.rates.modelYear).note;
+  const residualCap = maxResidual(deal.lease.termMonths, deal.rates.tier);
+  const linked = deal.rates.kind !== 'manual' && deal.rates.linkTerms;
+  const synced = isProgramSynced(deal);
 
   const preview: Record<MethodKey, string> = {
     cash: `${formatMoneyCompact(comparison.cash!.cashRequired)} at acquisition`,
@@ -65,9 +82,18 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
         </div>
       </header>
 
+      <nav className="tabs">
+        {TABS.map((t) => (
+          <button key={t.key} className="tab" aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="setup-body">
         <div className="setup-grid">
           <div className="stack">
+            {tab === 'deal' && (
             <Panel title="Deal" hint="Client name and vehicle description are optional">
               <div className="field-grid">
                 <Field label="Client / company">
@@ -78,6 +104,22 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                     value={deal.vehicleDescription}
                     onChange={(v) => set({ vehicleDescription: v })}
                     placeholder="Optional"
+                  />
+                </Field>
+                <Field label="Condition">
+                  <Segmented
+                    value={deal.rates.condition}
+                    options={[
+                      { value: 'new' as const, label: 'New' },
+                      { value: 'used' as const, label: 'Used' },
+                    ]}
+                    onChange={(v) => set({ rates: { ...deal.rates, condition: v } })}
+                  />
+                </Field>
+                <Field label="Model year">
+                  <IntegerInput
+                    value={deal.rates.modelYear}
+                    onChange={(v) => set({ rates: { ...deal.rates, modelYear: v } })}
                   />
                 </Field>
                 <Field label="MSRP">
@@ -92,9 +134,12 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
               </div>
               <p className="note" style={{ marginBottom: 0 }}>
                 Selling price is what the client actually pays before tax and fees. Leave it blank to use MSRP.
+                Condition and model year set the lender rate class — {vehicleClassNote}
               </p>
             </Panel>
+            )}
 
+            {tab === 'deal' && (
             <Panel title="Structures to compare" hint="Deselected structures are removed from the presentation">
               <div className="structure-list">
                 {(['cash', 'finance', 'lease'] as MethodKey[]).map((key) => (
@@ -115,7 +160,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 ))}
               </div>
             </Panel>
+            )}
 
+            {tab === 'costs' && (
             <Panel title="Additional costs" hint="Upfits, wraps, accessories, service agreements">
               {deal.additionalCosts.length > 0 && (
                 <div className="cost-row cost-head">
@@ -198,7 +245,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </button>
               </div>
             </Panel>
+            )}
 
+            {tab === 'costs' && (
             <Panel title="Trade-in" hint="Optional">
               <Check checked={deal.trade.enabled} onChange={(v) => set({ trade: { ...deal.trade, enabled: v } })}>
                 Include a trade-in
@@ -234,9 +283,11 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </>
               )}
             </Panel>
+            )}
           </div>
 
           <div className="stack">
+            {tab === 'tax' && (
             <Panel title="Tax settings" hint="Assumptions you control">
               <div className="field-grid">
                 <Field label="Preset">
@@ -317,7 +368,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   : `; ${formatCurrency(comparison.lease!.costs.tax.tax)} for the lease.`}
               </p>
             </Panel>
+            )}
 
+            {tab === 'costs' && (
             <Panel title="Transaction costs" hint="Held in the calculation layer">
               <div className="field-grid three">
                 <Field label="Bank fee">
@@ -393,7 +446,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 Show detailed transaction costs in the presentation
               </Check>
             </Panel>
+            )}
 
+            {tab === 'terms' && (
             <Panel title="Finance terms">
               <div className="field-grid">
                 <Field label="Down payment">
@@ -448,7 +503,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   : ''}
               </p>
             </Panel>
+            )}
 
+            {tab === 'terms' && (
             <Panel title="Open-end / TRAC lease terms">
               <div className="field-grid">
                 <Field label="Initial cash / cap reduction">
@@ -460,7 +517,7 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 <Field label="Term">
                   <IntegerInput
                     value={deal.lease.termMonths}
-                    onChange={(v) => set({ lease: { ...deal.lease, termMonths: Math.max(1, v) } })}
+                    onChange={(v) => onChange(applyProgramTerm(deal, Math.max(1, v)))}
                     suffix="mo"
                   />
                 </Field>
@@ -500,7 +557,7 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   />
                 </Field>
                 {deal.lease.residualMode === 'percent' ? (
-                  <Field label="Residual percent">
+                  <Field label="Residual percent" hint={`tier ${deal.rates.tier} max ${(residualCap * 100).toFixed(0)}%`}>
                     <PercentInput
                       value={deal.lease.residualPercent}
                       onChange={(v) => set({ lease: { ...deal.lease, residualPercent: v } })}
@@ -537,16 +594,43 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   </Field>
                 </div>
               )}
+              {linked && (
+                <p className={synced ? 'note' : 'note warn'} style={{ marginTop: 10, marginBottom: 0 }}>
+                  {synced
+                    ? `Rate and residual follow the Ally sheet for a ${deal.lease.termMonths} month tier ${deal.rates.tier} deal. Change the term and both update.`
+                    : 'Rate or residual has been edited away from the sheet. Use the button below to put it back.'}
+                </p>
+              )}
+              {linked && !synced && (
+                <div style={{ marginTop: 10 }}>
+                  <button className="btn" onClick={() => onChange(applyProgramTerm(deal, deal.lease.termMonths))}>
+                    Restore sheet rate and residual
+                  </button>
+                </div>
+              )}
+              {deal.rates.kind === 'comtrac' && deal.lease.residualMode === 'percent' && !linked && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="btn"
+                    onClick={() => set({ lease: { ...deal.lease, residualPercent: residualCap } })}
+                    disabled={Math.abs(deal.lease.residualPercent - residualCap) < 1e-9}
+                  >
+                    Use tier {deal.rates.tier} maximum residual — {(residualCap * 100).toFixed(0)}%
+                  </button>
+                </div>
+              )}
               <p className="note" style={{ marginBottom: 0 }}>
                 Residual basis {formatCurrency(leasePreview.residualBasis)} · residual{' '}
                 {formatCurrency(leasePreview.residualAmount)} · capitalized amount{' '}
                 {formatCurrency(leasePreview.capitalizedAmount)} · payment {formatCurrency(leasePreview.payment)}
               </p>
             </Panel>
+            )}
 
+            {tab === 'terms' && (
             <Panel title="Comparison assumptions">
               <div className="field-grid">
-                <Field label="Estimated vehicle value at comparison date">
+                <Field label="Estimated vehicle value at comparison date" hint="what it is worth at the end">
                   <MoneyInput
                     value={deal.estimatedVehicleValue}
                     onChange={(v) => set({ estimatedVehicleValue: v })}
@@ -597,7 +681,9 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 .
               </p>
             </Panel>
+            )}
 
+            {tab === 'lender' && (
             <Panel title="Presentation steps" hint="Toggle what the client sees">
               <div style={{ display: 'grid', gap: 9 }}>
                 <Check checked={deal.showReplacementStep} onChange={(v) => set({ showReplacementStep: v })}>
@@ -608,7 +694,7 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </Check>
                 {deal.showCycleStep && (
                   <div className="field-grid" style={{ marginTop: 2 }}>
-                    <Field label="Number of cycles">
+                    <Field label="Number of cycles" hint="how many trucks in a row">
                       <IntegerInput
                         value={deal.cycleCount}
                         onChange={(v) => set({ cycleCount: Math.min(4, Math.max(2, v)) })}
@@ -626,10 +712,11 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 value you assume, and it will not always favour the same structure.
               </p>
             </Panel>
+            )}
 
-            <RateProgramPanel deal={deal} onChange={onChange} />
+            {tab === 'lender' && <RateProgramPanel deal={deal} onChange={onChange} />}
 
-            <BuildUpPanel deal={deal} />
+            {tab === 'review' && <BuildUpPanel deal={deal} />}
           </div>
         </div>
       </div>

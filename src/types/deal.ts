@@ -105,6 +105,8 @@ export interface RateProgramSettings {
   baseVehicleValue: number;
   /** Apply the program rate to the finance column as well as the lease. */
   applyToFinance: boolean;
+  /** Rate and residual follow the sheet whenever the term changes. */
+  linkTerms: boolean;
 }
 
 /** Optional, operator-entered. Off by default: no return is assumed unless stated. */
