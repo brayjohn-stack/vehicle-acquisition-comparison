@@ -82,10 +82,13 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 <Field label="MSRP">
                   <MoneyInput value={deal.msrp} onChange={(v) => set({ msrp: v })} />
                 </Field>
-                <Field label="Acquisition price" hint={deal.acquisitionPrice > 0 ? undefined : 'defaults to MSRP'}>
+                <Field label="Selling price" hint={deal.acquisitionPrice > 0 ? undefined : 'defaults to MSRP'}>
                   <MoneyInput value={deal.acquisitionPrice} onChange={(v) => set({ acquisitionPrice: v })} />
                 </Field>
               </div>
+              <p className="note" style={{ marginBottom: 0 }}>
+                Selling price is what the client actually pays before tax and fees. Leave it blank to use MSRP.
+              </p>
             </Panel>
 
             <Panel title="Structures to compare" hint="Deselected structures are removed from the presentation">
@@ -284,6 +287,10 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </Check>
               </div>
               <p className="note" style={{ marginBottom: 0 }}>
+                Two rates because a purchase and a lease can be taxed differently on the paperwork. Tick the box below
+                to keep them in step.
+              </p>
+              <p className="note" style={{ marginBottom: 0 }}>
                 Tax on {formatCurrency(comparison.finance!.costs.tax.taxableAmount)} ={' '}
                 {formatCurrency(comparison.finance!.costs.tax.tax)} for cash and finance
                 {deal.tax.useSameRate
@@ -406,6 +413,10 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   </select>
                 </Field>
               </div>
+              <p className="note" style={{ marginBottom: 0 }}>
+                Arrears means the first payment falls a month after delivery, which is normal for a loan. Advance means
+                the first payment is due at signing.
+              </p>
               <p className="note" style={{ marginBottom: 0 }}>
                 Amount financed {formatCurrency(comparison.finance!.amountFinanced)} · payment{' '}
                 {formatCurrency(comparison.finance!.payment)} · total interest{' '}
@@ -538,6 +549,16 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                     />
                   </Field>
                 )}
+              </div>
+              <div className="field-grid" style={{ marginTop: 12 }}>
+                <Field label="Next vehicle cost" hint="defaults to this vehicle's price">
+                  <MoneyInput value={deal.nextVehiclePrice} onChange={(v) => set({ nextVehiclePrice: v })} />
+                </Field>
+                <div className="field" style={{ justifyContent: 'flex-end', paddingBottom: 6 }}>
+                  <Check checked={deal.showReplacementStep} onChange={(v) => set({ showReplacementStep: v })}>
+                    Include the next-vehicle step
+                  </Check>
+                </div>
               </div>
               {deal.estimatedVehicleValue === 0 && (
                 <p className="note warn" style={{ marginBottom: 0 }}>

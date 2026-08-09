@@ -193,3 +193,28 @@ describe('comparison', () => {
     expect(result.liquidity.monthlyDifference).not.toBeNull();
   });
 });
+
+describe('net cost over the period', () => {
+  it('is cumulative cash outflow less estimated equity', () => {
+    const result = computeComparison(createSampleDeal());
+    for (const m of result.methods) {
+      expect(m.netCostOfUse).toBeCloseTo(m.cumulativeCash - m.estimatedEquity, 2);
+    }
+  });
+
+  it('charges a below-residual lease for the shortfall rather than crediting equity', () => {
+    const d = createSampleDeal();
+    d.estimatedVehicleValue = 8000;
+    const lease = computeComparison(d).methods.find((m) => m.key === 'lease')!;
+    expect(lease.estimatedEquity).toBeLessThan(0);
+    // Negative equity increases the net cost by the shortfall.
+    expect(lease.netCostOfUse).toBeCloseTo(lease.cumulativeCash + Math.abs(lease.estimatedEquity), 2);
+  });
+
+  it('does not penalise cash for deploying capital into an asset it still owns', () => {
+    const d = createSampleDeal();
+    const cash = computeComparison(d).methods.find((m) => m.key === 'cash')!;
+    expect(cash.netCostOfUse).toBeCloseTo(cash.initialCash - d.estimatedVehicleValue, 2);
+    expect(cash.netCostOfUse).toBeLessThan(cash.initialCash);
+  });
+});

@@ -386,13 +386,87 @@ export function StepPosition({ result }: StepProps) {
   );
 }
 
+/* ---------------- Replacement — getting into the next vehicle ---------------- */
+
+export function StepReplacement({ result }: StepProps) {
+  const next = result.nextVehiclePrice;
+  return (
+    <>
+      <Columns result={result}>
+        {result.methods.map((m) => {
+          const shortfall = m.estimatedEquity < 0;
+          const applied = Math.max(0, m.estimatedEquity);
+          return (
+            <Col key={m.key} mkey={m.key} title={SHORT_LABEL[m.key]}>
+              <div className="ladder">
+                <Plate k="Next vehicle cost" v={formatMoneyCompact(next)} />
+                <Plate
+                  k={shortfall ? 'Amount due at termination' : 'Equity applied from current vehicle'}
+                  v={formatMoneyCompact(Math.abs(m.estimatedEquity))}
+                  op={shortfall ? '+' : '−'}
+                  tone={shortfall ? 'negative' : 'positive'}
+                />
+                <Plate
+                  k="Remaining to finance, lease or pay"
+                  v={formatMoneyCompact(next - applied + (shortfall ? Math.abs(m.estimatedEquity) : 0))}
+                  op="="
+                  total
+                />
+              </div>
+              <p className="note" style={{ margin: 0 }}>
+                {shortfall
+                  ? `Estimated value is below the remaining payoff, so ${formatMoneyCompact(
+                      Math.abs(m.estimatedEquity),
+                    )} is payable at termination and there is no equity to apply.`
+                  : m.key === 'lease'
+                    ? 'The residual is satisfied first; only value above it carries forward.'
+                    : 'No payoff remains, so the full estimated value carries forward.'}
+              </p>
+            </Col>
+          );
+        })}
+      </Columns>
+      <p className="note" style={{ margin: 0 }}>
+        Equity shown is the estimated amount available toward the replacement vehicle after any remaining payoff or
+        residual is satisfied. Next vehicle cost is an assumption and excludes tax and fees on that transaction.
+      </p>
+    </>
+  );
+}
+
 /* ---------------- Step 6 — comparison summary ---------------- */
 
 export function StepSummary({ deal, result }: StepProps) {
   const month = result.comparisonMonth;
   const m = result.methods;
-  const cell = (fn: (x: MethodComparison) => string) => m.map((x) => <td key={x.key}>{fn(x)}</td>);
   const dash = '—';
+
+  /**
+   * Marks the lower cash figure or the higher equity figure in a row. It is a
+   * factual comparison of that row only — never an overall recommendation.
+   */
+  const favored = (values: (number | null)[], direction: 'low' | 'high'): number => {
+    const usable = values.map((v, i) => ({ v, i })).filter((x) => x.v !== null) as { v: number; i: number }[];
+    if (usable.length < 2) return -1;
+    const best = usable.reduce((a, b) => (direction === 'low' ? (b.v < a.v ? b : a) : b.v > a.v ? b : a));
+    if (usable.filter((x) => x.v === best.v).length > 1) return -1;
+    return best.i;
+  };
+
+  const cell = (fn: (x: MethodComparison) => string) => m.map((x) => <td key={x.key}>{fn(x)}</td>);
+
+  const marked = (
+    pick: (x: MethodComparison) => number | null,
+    format: (x: MethodComparison) => string,
+    direction: 'low' | 'high',
+  ) => {
+    const idx = favored(m.map(pick), direction);
+    return m.map((x, i) => (
+      <td key={x.key} data-favor={i === idx ? 'true' : undefined}>
+        {format(x)}
+      </td>
+    ));
+  };
 
   return (
     <>
@@ -410,11 +484,15 @@ export function StepSummary({ deal, result }: StepProps) {
         <tbody>
           <tr>
             <td className="metric">Initial cash required</td>
-            {cell((x) => formatCurrency(x.initialCash, 0))}
+            {marked((x) => x.initialCash, (x) => formatCurrency(x.initialCash, 0), 'low')}
           </tr>
           <tr>
             <td className="metric">Monthly payment</td>
-            {cell((x) => (x.monthlyPayment === null ? dash : formatCurrency(x.monthlyPayment)))}
+            {marked(
+              (x) => x.monthlyPayment,
+              (x) => (x.monthlyPayment === null ? dash : formatCurrency(x.monthlyPayment)),
+              'low',
+            )}
           </tr>
           <tr>
             <td className="metric">Term / APR</td>
@@ -438,7 +516,7 @@ export function StepSummary({ deal, result }: StepProps) {
           </tr>
           <tr className="group-start">
             <td className="metric">Cumulative scheduled cash outflow</td>
-            {cell((x) => formatCurrency(x.cumulativeCash, 0))}
+            {marked((x) => x.cumulativeCash, (x) => formatCurrency(x.cumulativeCash, 0), 'low')}
           </tr>
           <tr>
             <td className="metric">Estimated vehicle value</td>
@@ -449,12 +527,23 @@ export function StepSummary({ deal, result }: StepProps) {
             {cell((x) => formatCurrency(x.payoffAtComparison, 0))}
           </tr>
           <tr className="emphasis">
-            <td className="metric">Estimated equity</td>
-            {m.map((x) => (
-              <td key={x.key} className={x.estimatedEquity < 0 ? 'neg' : 'pos'}>
-                {formatCurrency(x.estimatedEquity, 0)}
-              </td>
-            ))}
+            <td className="metric">Estimated equity toward the next vehicle</td>
+            {(() => {
+              const idx = favored(m.map((x) => x.estimatedEquity), 'high');
+              return m.map((x, i) => (
+                <td key={x.key} className={x.estimatedEquity < 0 ? 'neg' : 'pos'} data-favor={i === idx ? 'true' : undefined}>
+                  {formatCurrency(x.estimatedEquity, 0)}
+                </td>
+              ));
+            })()}
+          </tr>
+          <tr className="emphasis">
+            <td className="metric">
+              <Term tip="Cumulative scheduled cash outflow less estimated equity at the comparison date. It measures what the period cost net of what is still held, and ignores the time value of money and any tax treatment.">
+                Net cost over the period
+              </Term>
+            </td>
+            {marked((x) => x.netCostOfUse, (x) => formatCurrency(x.netCostOfUse, 0), 'low')}
           </tr>
           {deal.showTransactionCosts && (
             <tr className="group-start">
@@ -464,6 +553,11 @@ export function StepSummary({ deal, result }: StepProps) {
           )}
         </tbody>
       </table>
+
+      <p className="table-legend">
+        A marker indicates the lower cash figure or the higher equity figure in that row only. It is not a
+        recommendation, and no structure is best on every row.
+      </p>
 
       <div className="takeaways">
         {result.takeaways.map((t, i) => (

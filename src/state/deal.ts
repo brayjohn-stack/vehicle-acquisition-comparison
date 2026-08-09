@@ -57,6 +57,8 @@ export function createEmptyDeal(): Deal {
       firstPaymentDays: 30,
     },
     estimatedVehicleValue: 0,
+    nextVehiclePrice: 0,
+    showReplacementStep: true,
     comparisonMonthMode: 'term',
     comparisonMonth: 60,
     methods: { cash: false, finance: true, lease: true },

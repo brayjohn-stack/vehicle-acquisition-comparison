@@ -28,7 +28,13 @@ export default function App() {
           onReset={() => setConfirmReset(true)}
         />
       ) : (
-        <Presentation deal={deal} step={step} onStepChange={setStep} onEdit={() => setView('setup')} />
+        <Presentation
+          deal={deal}
+          step={step}
+          onStepChange={setStep}
+          onDealChange={setDeal}
+          onEdit={() => setView('setup')}
+        />
       )}
 
       {confirmReset && (

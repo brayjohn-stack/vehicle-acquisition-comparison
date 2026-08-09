@@ -28,6 +28,12 @@ export interface MethodComparison {
   estimatedVehicleValue: number;
   estimatedEquity: number;
   residualPercent: number | null;
+  /**
+   * Cumulative scheduled cash outflow less estimated equity at the comparison
+   * date: what the period cost net of what the client still holds. Ignores the
+   * time value of money.
+   */
+  netCostOfUse: number;
 }
 
 export interface ComparisonResult {
@@ -35,6 +41,8 @@ export interface ComparisonResult {
   comparisonMonth: number;
   estimatedVehicleValue: number;
   totalProjectCost: number;
+  /** Cost of the replacement vehicle used on the next-vehicle step. */
+  nextVehiclePrice: number;
   trade: TradeResult;
   cash: CashResult | null;
   finance: FinanceResult | null;
@@ -97,6 +105,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
       estimatedVehicleValue: value,
       estimatedEquity: value,
       residualPercent: null,
+      netCostOfUse: cash.cashRequired - value,
     });
   }
 
@@ -119,6 +128,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
       estimatedVehicleValue: value,
       estimatedEquity: round2(value - payoff),
       residualPercent: null,
+      netCostOfUse: round2(finance.cumulativeCashThroughMonth(month) - (value - payoff)),
     });
   }
 
@@ -141,6 +151,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
       estimatedVehicleValue: value,
       estimatedEquity: round2(value - payoff),
       residualPercent: lease.residualPercent,
+      netCostOfUse: round2(lease.cumulativeCashThroughMonth(month) - (value - payoff)),
     });
   }
 
@@ -165,6 +176,7 @@ export function computeComparison(deal: Deal): ComparisonResult {
     comparisonMonth: month,
     estimatedVehicleValue: value,
     totalProjectCost: costs.totalProjectCost,
+    nextVehiclePrice: deal.nextVehiclePrice > 0 ? deal.nextVehiclePrice : costs.acquisitionPrice,
     trade,
     cash,
     finance,

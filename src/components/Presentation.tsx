@@ -8,15 +8,19 @@ import {
   StepMonthly,
   StepPosition,
   StepSummary,
+  StepReplacement,
   StepTrade,
   type StepProps,
 } from './steps';
+import ScenarioBar from './ScenarioBar';
 
 interface StepDefinition {
   id: string;
   eyebrow: string;
   title: string;
   intro?: string;
+  /** Steps that depend on the future-value assumption get the live scenario bar. */
+  scenario?: boolean;
   render: (props: StepProps) => JSX.Element;
 }
 
@@ -24,10 +28,11 @@ interface Props {
   deal: Deal;
   step: number;
   onStepChange: (step: number) => void;
+  onDealChange: (deal: Deal) => void;
   onEdit: () => void;
 }
 
-export default function Presentation({ deal, step, onStepChange, onEdit }: Props) {
+export default function Presentation({ deal, step, onStepChange, onDealChange, onEdit }: Props) {
   const result = useMemo(() => computeComparison(deal), [deal]);
   const month = result.comparisonMonth;
 
@@ -77,18 +82,32 @@ export default function Presentation({ deal, step, onStepChange, onEdit }: Props
         eyebrow: 'Position',
         title: `Where does each structure stand at month ${month}?`,
         intro: 'Estimated equity is vehicle value above any remaining payoff or residual.',
+        scenario: true,
         render: (p) => <StepPosition {...p} />,
-      },
-      {
-        id: 'summary',
-        eyebrow: 'Summary',
-        title: 'Side-by-side comparison',
-        render: (p) => <StepSummary {...p} />,
       },
     );
 
+    if (deal.showReplacementStep) {
+      list.push({
+        id: 'replacement',
+        eyebrow: 'Next vehicle',
+        title: 'What happens when it is time for the next vehicle?',
+        intro: 'What each structure leaves available to put toward the replacement.',
+        scenario: true,
+        render: (p) => <StepReplacement {...p} />,
+      });
+    }
+
+    list.push({
+      id: 'summary',
+      eyebrow: 'Summary',
+      title: 'Side-by-side comparison',
+      scenario: true,
+      render: (p) => <StepSummary {...p} />,
+    });
+
     return list;
-  }, [deal.trade.enabled, deal.showTradeStep, month]);
+  }, [deal.trade.enabled, deal.showTradeStep, deal.showReplacementStep, month]);
 
   const index = Math.min(Math.max(step, 0), steps.length - 1);
   const current = steps[index];
@@ -145,6 +164,7 @@ export default function Presentation({ deal, step, onStepChange, onEdit }: Props
           </div>
           <div className="step-content" key={current.id}>
             {current.render({ deal, result })}
+            {current.scenario && <ScenarioBar deal={deal} result={result} onChange={onDealChange} />}
           </div>
         </div>
       </main>

@@ -93,6 +93,9 @@ export interface Deal {
   finance: FinanceTerms;
   lease: LeaseTerms;
   estimatedVehicleValue: number;
+  /** Cost of the replacement vehicle. Falls back to the current acquisition price. */
+  nextVehiclePrice: number;
+  showReplacementStep: boolean;
   comparisonMonthMode: 'term' | 'custom';
   comparisonMonth: number;
   methods: Record<MethodKey, boolean>;

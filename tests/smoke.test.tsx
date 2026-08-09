@@ -45,7 +45,7 @@ describe('application smoke test', () => {
     expect(host.textContent).toContain('How are we acquiring the vehicle?');
 
     const dots = host.querySelectorAll('.dot').length;
-    expect(dots).toBe(6);
+    expect(dots).toBe(7); // adds the next-vehicle step
     for (let i = 1; i < dots; i++) await click('Next');
     expect(host.textContent).toContain('Estimated equity');
     expect(host.querySelector('.summary-table')).toBeTruthy();
