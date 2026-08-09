@@ -120,7 +120,8 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
               {deal.additionalCosts.length > 0 && (
                 <div className="cost-row cost-head">
                   <div>Description</div>
-                  <div style={{ textAlign: 'right' }}>Amount</div>
+                  <div style={{ textAlign: 'right' }}>Client pays</div>
+                  <div style={{ textAlign: 'right' }}>Your cost</div>
                   <div>Taxable</div>
                   <div>Capitalized</div>
                   <div />
@@ -128,6 +129,12 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
               )}
               {deal.additionalCosts.length === 0 && (
                 <p className="empty-note">No additional costs entered. Add upfit, wrap, delivery or service items here.</p>
+              )}
+              {deal.additionalCosts.length > 0 && (
+                <p className="note" style={{ marginTop: 0 }}>
+                  Your cost is what the item cost you, used only for the lender's advance test — upfits are valued at cost,
+                  not at retail. Leave it blank to use the client price.
+                </p>
               )}
               {deal.additionalCosts.map((cost, i) => (
                 <div className="cost-row" key={cost.id}>
@@ -145,6 +152,14 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                     onChange={(v) => {
                       const next = [...deal.additionalCosts];
                       next[i] = { ...cost, amount: v };
+                      set({ additionalCosts: next });
+                    }}
+                  />
+                  <MoneyInput
+                    value={cost.dealerCost}
+                    onChange={(v) => {
+                      const next = [...deal.additionalCosts];
+                      next[i] = { ...cost, dealerCost: v };
                       set({ additionalCosts: next });
                     }}
                   />

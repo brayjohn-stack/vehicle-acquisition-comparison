@@ -1,4 +1,4 @@
-import type { AllyTier, RateProgramKind, VehicleClass } from '../rates/ally';
+import type { AllyTier, RateProgramKind, VehicleCondition } from '../rates/ally';
 
 export type PaymentTiming = 'arrears' | 'advance';
 export type MethodKey = 'cash' | 'finance' | 'lease';
@@ -6,7 +6,13 @@ export type MethodKey = 'cash' | 'finance' | 'lease';
 export interface AdditionalCost {
   id: string;
   description: string;
+  /** What the client pays for this item. */
   amount: number;
+  /**
+   * What the item cost the dealer. Used only for the lender's advance test,
+   * which values upfits at cost rather than at retail. Zero falls back to amount.
+   */
+  dealerCost: number;
   taxable: boolean;
   capitalized: boolean;
 }
@@ -87,12 +93,16 @@ export interface LeaseTerms {
 export interface RateProgramSettings {
   kind: RateProgramKind;
   tier: AllyTier;
-  vehicleClass: VehicleClass;
+  condition: VehicleCondition;
+  modelYear: number;
   federalExempt: boolean;
   directOrEv: boolean;
   municipalOutstandings: number;
-  /** Estimated dealer cost / average wholesale value incl. upfits. 0 uses the selling price. */
-  edcAwv: number;
+  /**
+   * Base vehicle only: dealer invoice when new, book wholesale when used.
+   * Capitalized upfits are added at cost to derive the EDC/AWV.
+   */
+  baseVehicleValue: number;
   /** Apply the program rate to the finance column as well as the lease. */
   applyToFinance: boolean;
 }

@@ -403,7 +403,7 @@ select.plain {
 
 .cost-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 118px 78px 92px 28px;
+  grid-template-columns: minmax(0, 1fr) 108px 108px 78px 92px 28px;
   gap: 8px;
   align-items: center;
   padding: 5px 0;
@@ -1087,8 +1087,7 @@ select.plain {
     display: none;
   }
   .cost-row {
-    grid-template-columns: minmax(0, 1fr) 100px;
-    grid-template-areas: none;
+    grid-template-columns: minmax(0, 1fr) 100px 100px;
   }
   .cost-head {
     display: none;
@@ -1424,10 +1423,32 @@ select.plain {
   }
 
   .cost-row {
-    grid-template-columns: minmax(0, 1fr) 96px;
+    grid-template-columns: minmax(0, 1fr) 96px 96px;
   }
 
   .program-quote {
     gap: 16px;
   }
+}
+
+
+.valuation {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--slate);
+  border-top: 1px solid var(--rule);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.valuation .op {
+  color: var(--brass);
+}
+
+.valuation strong {
+  color: var(--navy);
+  font-size: 14px;
 }

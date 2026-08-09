@@ -8,10 +8,12 @@ import {
   maxDfiPercent,
   municipalRate,
   programRate,
+  deriveVehicleClass,
   FEDERAL_EXEMPT_ADDER,
 } from '../src/rates/ally';
+import { computeValuation } from '../src/calculations/valuation';
 import { projectCycles } from '../src/calculations/cycles';
-import { createSampleDeal } from '../src/state/deal';
+import { createEmptyDeal, createSampleDeal, newCostRow } from '../src/state/deal';
 
 describe('Ally ComTRAC rate sheet', () => {
   it('reads rates by class, term band and tier', () => {
@@ -156,5 +158,75 @@ describe('replacement cycle projection', () => {
     const p = projectCycles(createSampleDeal(), 'finance', 2);
     expect(p.netCost).toBeCloseTo(p.totalCashOutflow - p.finalEquity, 2);
     expect(p.totalMonths).toBe(120);
+  });
+});
+
+describe('vehicle class derivation', () => {
+  it('rates a new vehicle on the New line regardless of model year', () => {
+    // The trap: a new 2025 on the lot is New, not CSU — 0.80 points at tier B.
+    expect(deriveVehicleClass('new', 2025).vehicleClass).toBe('new');
+    expect(deriveVehicleClass('new', 2026).vehicleClass).toBe('new');
+    expect(comtracRate('new', 60, 'B')).toBeCloseTo(0.1144, 6);
+    expect(comtracRate('csu', 60, 'B')).toBeCloseTo(0.1224, 6);
+  });
+
+  it('maps used current-series years to CSU and 2024 to its own line', () => {
+    expect(deriveVehicleClass('used', 2025).vehicleClass).toBe('csu');
+    expect(deriveVehicleClass('used', 2027).vehicleClass).toBe('csu');
+    expect(deriveVehicleClass('used', 2024).vehicleClass).toBe('my2024');
+  });
+
+  it('flags used vehicles that are not on the sheet', () => {
+    const older = deriveVehicleClass('used', 2022);
+    expect(older.supported).toBe(false);
+    expect(older.note).toContain('not on this rate sheet');
+  });
+});
+
+describe('EDC / AWV valuation', () => {
+  it('adds capitalized upfits at dealer cost, not at retail', () => {
+    const d = createEmptyDeal();
+    d.acquisitionPrice = 39000;
+    d.rates = { ...d.rates, baseVehicleValue: 35000 };
+    d.additionalCosts = [
+      newCostRow({ description: 'Aerial device', amount: 20000, dealerCost: 15000, capitalized: true }),
+    ];
+    const v = computeValuation(d);
+    expect(v.upfitsAtCost).toBeCloseTo(15000, 2);
+    expect(v.edcAwv).toBeCloseTo(50000, 2);
+    expect(v.estimated).toBe(false);
+  });
+
+  it('falls back to the client price when no dealer cost is entered', () => {
+    const d = createEmptyDeal();
+    d.rates = { ...d.rates, baseVehicleValue: 35000 };
+    d.additionalCosts = [newCostRow({ description: 'Wrap', amount: 3000, dealerCost: 0, capitalized: true })];
+    expect(computeValuation(d).edcAwv).toBeCloseTo(38000, 2);
+  });
+
+  it('marks the valuation estimated when no base value is entered', () => {
+    const d = createEmptyDeal();
+    d.acquisitionPrice = 39000;
+    const v = computeValuation(d);
+    expect(v.estimated).toBe(true);
+    expect(v.edcAwv).toBeCloseTo(39000, 2);
+  });
+
+  it('understates the advance when the selling price stands in for invoice', () => {
+    const d = createEmptyDeal();
+    d.acquisitionPrice = 33300;
+    const withSellingPrice = computeValuation(d).edcAwv;
+    d.rates = { ...d.rates, baseVehicleValue: 32000 };
+    const withInvoice = computeValuation(d).edcAwv;
+    // Smaller denominator means a higher, truer advance percentage.
+    expect(withInvoice).toBeLessThan(withSellingPrice);
+    expect(42000 / withInvoice).toBeGreaterThan(42000 / withSellingPrice);
+  });
+
+  it('excludes non-capitalized items from the advance test', () => {
+    const d = createEmptyDeal();
+    d.rates = { ...d.rates, baseVehicleValue: 30000 };
+    d.additionalCosts = [newCostRow({ description: 'Prepaid maintenance', amount: 2000, capitalized: false })];
+    expect(computeValuation(d).edcAwv).toBeCloseTo(30000, 2);
   });
 });

@@ -24,6 +24,33 @@ export const VEHICLE_CLASS_LABELS: Record<VehicleClass, string> = {
   my2024: '2024 model year',
 };
 
+export type VehicleCondition = 'new' | 'used';
+
+/**
+ * Picks the rate class from what the operator actually knows: is it new, and what
+ * model year is it. "CSU" on the sheet means current series *used* — a new 2025
+ * sitting on the lot is New, which is a 0.80 point difference at tier B.
+ */
+export function deriveVehicleClass(
+  condition: VehicleCondition,
+  modelYear: number,
+): { vehicleClass: VehicleClass; supported: boolean; note: string } {
+  if (condition === 'new') {
+    return { vehicleClass: 'new', supported: true, note: 'New — rated on the New line regardless of model year.' };
+  }
+  if (modelYear >= 2025 && modelYear <= 2027) {
+    return { vehicleClass: 'csu', supported: true, note: 'Used, current series — rated on the CSU 2027–2025 line.' };
+  }
+  if (modelYear === 2024) {
+    return { vehicleClass: 'my2024', supported: true, note: 'Used — rated on the 2024 model year line.' };
+  }
+  return {
+    vehicleClass: 'my2024',
+    supported: false,
+    note: `A ${modelYear || 'pre-2024'} used vehicle is not on this rate sheet. Confirm eligibility and pricing with your underwriter.`,
+  };
+}
+
 /** Rate sheet rows are banded by year; these map a month term onto the band. */
 function rateBand(termMonths: number): 1 | 3 | 4 | 5 | 6 {
   if (termMonths <= 24) return 1; // the sheet's combined "1 & 2 yr" row

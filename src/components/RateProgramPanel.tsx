@@ -1,20 +1,21 @@
 import type { Deal } from '../types/deal';
-import type { AllyTier, RateProgramKind, VehicleClass } from '../rates/ally';
+import type { AllyTier, RateProgramKind, VehicleCondition } from '../rates/ally';
 import {
   RATE_SHEET_EFFECTIVE,
   TIERS,
   VEHICLE_CLASS_LABELS,
   checkProgram,
   comtracRate,
+  deriveVehicleClass,
   maxAdvance,
   maxResidual,
   municipalBandLabel,
   programRate,
 } from '../rates/ally';
 import { computeLease } from '../calculations/lease';
-import { acquisitionPrice } from '../calculations/taxes';
+import { computeValuation } from '../calculations/valuation';
 import { formatCurrency, formatPercent } from '../calculations/money';
-import { Check, Field, MoneyInput, Panel, PercentInput } from './fields';
+import { Check, Field, IntegerInput, MoneyInput, Panel, PercentInput, Segmented } from './fields';
 
 /**
  * Lender program selection. The Ally sheet is marked for dealer use only, so this
@@ -24,12 +25,16 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
   const set = (patch: Partial<Deal['rates']>) => onChange({ ...deal, rates: { ...deal.rates, ...patch } });
   const r = deal.rates;
   const lease = computeLease(deal);
-  const edc = r.edcAwv > 0 ? r.edcAwv : acquisitionPrice(deal);
+  const valuation = computeValuation(deal);
+  const edc = valuation.edcAwv;
+  const derived = deriveVehicleClass(r.condition, r.modelYear);
+  const vehicleClass = derived.vehicleClass;
+  const valueLabel = r.condition === 'new' ? 'EDC — dealer invoice' : 'AWV — book wholesale';
 
   const quoted = programRate({
     kind: r.kind,
     tier: r.tier,
-    vehicleClass: r.vehicleClass,
+    vehicleClass,
     termMonths: deal.lease.termMonths,
     municipalOutstandings: r.municipalOutstandings,
     federalExempt: r.federalExempt,
@@ -38,7 +43,7 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
   const checks = checkProgram({
     kind: r.kind,
     tier: r.tier,
-    vehicleClass: r.vehicleClass,
+    vehicleClass,
     termMonths: deal.lease.termMonths,
     residualPercent: lease.residualPercent,
     amountAdvanced: lease.capitalizedAmount,
@@ -70,18 +75,25 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
             <option value="manual">Manual — enter rates myself</option>
           </select>
         </Field>
-        <Field label="Vehicle class">
-          <select
-            className="plain"
-            value={r.vehicleClass}
-            onChange={(e) => set({ vehicleClass: e.target.value as VehicleClass })}
-          >
-            {(Object.keys(VEHICLE_CLASS_LABELS) as VehicleClass[]).map((k) => (
-              <option key={k} value={k}>
-                {VEHICLE_CLASS_LABELS[k]}
-              </option>
-            ))}
-          </select>
+        <Field label="Condition">
+          <Segmented
+            value={r.condition}
+            options={[
+              { value: 'new' as VehicleCondition, label: 'New' },
+              { value: 'used' as VehicleCondition, label: 'Used' },
+            ]}
+            onChange={(v) => set({ condition: v })}
+          />
+        </Field>
+        <Field label="Model year">
+          <IntegerInput value={r.modelYear} onChange={(v) => set({ modelYear: v })} />
+        </Field>
+        <Field label="Rate class" hint="derived">
+          <div className="input" style={{ background: '#fbfbfa' }}>
+            <span style={{ fontSize: 12.5, color: derived.supported ? 'var(--navy)' : 'var(--negative)' }}>
+              {VEHICLE_CLASS_LABELS[vehicleClass]}
+            </span>
+          </div>
         </Field>
 
         {r.kind === 'comtrac' && (
@@ -89,7 +101,7 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
             <select className="plain" value={r.tier} onChange={(e) => set({ tier: e.target.value as AllyTier })}>
               {TIERS.map((t) => (
                 <option key={t} value={t}>
-                  Tier {t} — {formatPercent(comtracRate(r.vehicleClass, deal.lease.termMonths, t))} at{' '}
+                  Tier {t} — {formatPercent(comtracRate(vehicleClass, deal.lease.termMonths, t))} at{' '}
                   {deal.lease.termMonths} mo
                 </option>
               ))}
@@ -106,10 +118,32 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
           </Field>
         )}
 
-        <Field label="EDC / AWV incl. upfits" hint={r.edcAwv > 0 ? undefined : 'defaults to selling price'}>
-          <MoneyInput value={r.edcAwv} onChange={(v) => set({ edcAwv: v })} />
+        <Field label={valueLabel} hint="base vehicle only">
+          <MoneyInput value={r.baseVehicleValue} onChange={(v) => set({ baseVehicleValue: v })} />
         </Field>
       </div>
+
+      <p className="note" style={{ marginBottom: 0 }}>
+        {derived.note}
+      </p>
+
+      <div className="valuation">
+        <span>
+          {valuation.estimated ? 'Selling price' : r.condition === 'new' ? 'Dealer invoice' : 'Book wholesale'}{' '}
+          {formatCurrency(valuation.baseValue, 0)}
+        </span>
+        <span className="op">+</span>
+        <span>upfits at cost {formatCurrency(valuation.upfitsAtCost, 0)}</span>
+        <span className="op">=</span>
+        <strong>{formatCurrency(valuation.edcAwv, 0)} EDC / AWV</strong>
+      </div>
+      {valuation.estimated && (
+        <p className="note warn" style={{ marginBottom: 0 }}>
+          No {r.condition === 'new' ? 'dealer invoice' : 'book wholesale value'} entered, so the selling price is standing
+          in. Invoice and book values are lower than selling price, so the advance below is understated — the real figure
+          is higher. Enter the {r.condition === 'new' ? 'invoice' : 'book value'} before relying on it.
+        </p>
+      )}
 
       {r.kind !== 'manual' && (
         <>
@@ -126,6 +160,9 @@ export default function RateProgramPanel({ deal, onChange }: { deal: Deal; onCha
             <div>
               <span className="label">Max advance</span>
               <div className="figure-sm">{formatPercent(advanceCap, 0)}</div>
+              <span className="note" style={{ fontSize: 11 }}>
+                {edc >= 80000 ? 'EDC/AWV at or above $80,000' : 'EDC/AWV under $80,000'}
+              </span>
             </div>
             <button className="btn btn-primary" onClick={applyRate} disabled={quoted === null}>
               Apply rate
