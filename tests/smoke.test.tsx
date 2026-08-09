@@ -50,6 +50,16 @@ describe('application smoke test', () => {
     expect(host.textContent).toContain('Estimated equity');
     expect(host.querySelector('.summary-table')).toBeTruthy();
 
+    // Regression: .takeaway is a two-column grid whose first column is a rule
+    // drawn with ::before. A second child element pushes the text into the
+    // 14px column and it renders one word per line.
+    const takeaways = [...host.querySelectorAll('.takeaway')];
+    expect(takeaways.length).toBeGreaterThan(0);
+    for (const t of takeaways) {
+      expect(t.children.length).toBe(1);
+      expect(t.textContent!.length).toBeGreaterThan(20);
+    }
+
     await click('Edit deal');
     expect(host.textContent).toContain('Deal setup');
   });

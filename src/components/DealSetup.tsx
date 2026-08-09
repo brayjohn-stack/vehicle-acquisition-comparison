@@ -346,6 +346,20 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                 </Field>
               </div>
               <div className="row-divider" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <button
+                  className="btn"
+                  onClick={() =>
+                    set({ fees: { ...deal.fees, bankFee: 695, titleLicense: 245, docFee: 225 } })
+                  }
+                >
+                  Fill usual costs
+                </button>
+                <span className="note" style={{ margin: 0 }}>
+                  Bank fee $695 · license $245 · doc fee $225. Edit any of them afterwards.
+                </span>
+              </div>
+              <div className="row-divider" />
               <Check checked={deal.showTransactionCosts} onChange={(v) => set({ showTransactionCosts: v })}>
                 Show detailed transaction costs in the presentation
               </Check>
@@ -525,6 +539,12 @@ export default function DealSetup({ deal, onChange, onPresent, onLoadSample, onR
                   </Field>
                 )}
               </div>
+              {deal.estimatedVehicleValue === 0 && (
+                <p className="note warn" style={{ marginBottom: 0 }}>
+                  No estimated vehicle value entered. The end-of-term screens will show $0 of value and
+                  negative equity for any structure with a remaining payoff.
+                </p>
+              )}
               <p className="note" style={{ marginBottom: 0 }}>
                 Positions are compared at month {computeComparison(deal).comparisonMonth} against an estimated vehicle value
                 of {formatCurrency(deal.estimatedVehicleValue, 0)}

@@ -468,7 +468,6 @@ export function StepSummary({ deal, result }: StepProps) {
       <div className="takeaways">
         {result.takeaways.map((t, i) => (
           <div className="takeaway" key={i}>
-            <span />
             <span>{t}</span>
           </div>
         ))}
